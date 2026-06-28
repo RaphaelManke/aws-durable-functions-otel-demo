@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "aws-lambda-durable-functions",
+  "owner": "awslabs",
+  "repo": "agent-plugins",
+  "path": "plugins/aws-serverless/skills/aws-lambda-durable-functions",
+  "branch": "main",
+  "sha": "231ad85b82e17f243f48088aa7bec82453b17bbe",
+  "source": "manual"
+}

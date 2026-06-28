@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "skills": {
+    "aws-cdk": {
+      "source": "aws/agent-toolkit-for-aws",
+      "sourceType": "github",
+      "skillPath": "skills/core-skills/aws-cdk/SKILL.md",
+      "computedHash": "681d65ddfdb1d5f0454230c09cf3bc01b5dcf4c1484d99a098222b35f125d3ca"
+    },
+    "aws-iam": {
+      "source": "aws/agent-toolkit-for-aws",
+      "sourceType": "github",
+      "skillPath": "skills/core-skills/aws-iam/SKILL.md",
+      "computedHash": "e6b01570731dc3a67e26ecaaa5ce0d1d7b54f39f5e041a057f23f3b22c57cd9c"
+    },
+    "aws-lambda-durable-functions": {
+      "source": "/Users/rm/.opencode/skills/aws-lambda-durable-functions",
+      "sourceType": "local",
+      "computedHash": "a734422b43458bffd1c417a43ee3a2dfbfc58cea50e7fa59c69693138956832c"
+    },
+    "aws-observability": {
+      "source": "aws/agent-toolkit-for-aws",
+      "sourceType": "github",
+      "skillPath": "skills/core-skills/aws-observability/SKILL.md",
+      "computedHash": "bbc36e5d5aca0963f51b6ee5fc481ad302549569791dd1f81aecfb00d68c41fc"
+    },
+    "aws-serverless": {
+      "source": "aws/agent-toolkit-for-aws",
+      "sourceType": "github",
+      "skillPath": "skills/core-skills/aws-serverless/SKILL.md",
+      "computedHash": "dfae98db0b5f558c08427e20c608996a3378be9bb3097a5062440a1a0960b77d"
+    },
+    "otel-collector": {
+      "source": "dash0hq/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/otel-collector/SKILL.md",
+      "computedHash": "152301a7e20b7f090a2544dea78cfe45dfd671c1b1880af1d13806742e36cacd"
+    },
+    "otel-instrumentation": {
+      "source": "dash0hq/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/otel-instrumentation/SKILL.md",
+      "computedHash": "f7670d9799e0e272726234ad670bee9d5521eca54a21a5420d397c89557624ae"
+    },
+    "otel-ottl": {
+      "source": "dash0hq/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/otel-ottl/SKILL.md",
+      "computedHash": "a67241643a9cf03829f5c83676ce2532b58a61daffd2c17fd5b4dc7b95a51447"
+    },
+    "otel-semantic-conventions": {
+      "source": "dash0hq/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/otel-semantic-conventions/SKILL.md",
+      "computedHash": "174a55d99863fdc2f93ccdf221ef444aedabbd35ef4bc3ef24b61be52ce6148c"
+    }
+  }
+}
