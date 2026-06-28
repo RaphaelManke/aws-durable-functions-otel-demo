@@ -1,0 +1,28 @@
+graph TD
+  node_start([Start])
+  step_1[validate]
+  step_2[process]
+  wait_3((wait: cooldown))
+  invoke_4[/enrich-user\]
+  step_5[notify]
+  node_end([End])
+
+  node_start --> step_1
+  step_1 --> step_2
+  step_2 --> wait_3
+  wait_3 --> invoke_4
+  invoke_4 --> step_5
+  step_5 --> node_end
+
+  style node_start fill:#5b8ab4,stroke:#4a7293,color:#e8edf2
+  style step_1 fill:#4a8c72,stroke:#3d7360,color:#e0efe8
+  style step_2 fill:#4a8c72,stroke:#3d7360,color:#e0efe8
+  style wait_3 fill:#b05a5a,stroke:#8f4a4a,color:#f2e0e0
+  style invoke_4 fill:#b8873a,stroke:#967032,color:#f5edd8
+  style step_5 fill:#4a8c72,stroke:#3d7360,color:#e0efe8
+  style node_end fill:#5b8ab4,stroke:#4a7293,color:#e8edf2
+  click step_1 call onNodeClick(11)
+  click step_2 call onNodeClick(16)
+  click wait_3 call onNodeClick(20)
+  click invoke_4 call onNodeClick(22)
+  click step_5 call onNodeClick(27)

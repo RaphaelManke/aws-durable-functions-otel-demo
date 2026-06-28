@@ -2,22 +2,34 @@
   "name": "lambda-durable-function-otel",
   "version": "0.1.0",
   "scripts": {
-    "build": "tsc",
-    "watch": "tsc -w",
     "test": "jest",
-    "cdk": "cdk"
+    "synth": "cdk synth --profile otel-playground",
+    "diff": "cdk diff --profile otel-playground",
+    "deploy": "cdk deploy --profile otel-playground --require-approval never",
+    "destroy": "cdk destroy --profile otel-playground --force",
+    "cdk": "cdk",
+    "workflow-viz": "bash scripts/workflow-viz.sh"
   },
   "devDependencies": {
     "@types/jest": "^30",
     "@types/node": "^24.10.1",
+    "aws-cdk": "2.1128.1",
+    "durable-viz": "^0.4.1",
+    "esbuild": "^0.28.1",
     "jest": "^30",
     "ts-jest": "^29",
-    "aws-cdk": "2.1128.1",
     "ts-node": "^10.9.2",
+    "tsx": "^4.22.4",
     "typescript": "~5.9.3"
   },
   "dependencies": {
+    "@aws/durable-execution-sdk-js": "^2.0.0",
+    "@aws/durable-execution-sdk-js-otel": "^0.1.0",
     "aws-cdk-lib": "^2.260.0",
     "constructs": "^10.5.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "puppeteer@24.43.1": true
   }
 }
