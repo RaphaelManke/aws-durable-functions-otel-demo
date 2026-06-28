@@ -15,7 +15,8 @@ export class LambdaDurableFunctionOtelStack extends cdk.Stack {
     super(scope, id, props);
 
     // --- OTel instrumentation layer (toggle via: -c otelProvider=dash0|adot) ---
-    const otelProvider = this.node.tryGetContext('otelProvider') ?? 'dash0';
+    const otelProvider = "adot"
+    // const otelProvider = "dash0"
 
     const adotLayer = lambda.LayerVersion.fromLayerVersionArn(
       this, 'AdotLayer',
@@ -33,9 +34,11 @@ export class LambdaDurableFunctionOtelStack extends cdk.Stack {
           AWS_LAMBDA_EXEC_WRAPPER: '/opt/wrapper',
           DASH0_ENDPOINT: 'https://ingress.us-west-2.aws.dash0.com:4318',
           DASH0_TOKEN: ssm.StringParameter.valueForStringParameter(this, '/lambda-durable-otel/dash0-api-key'),
-          DASH0_XRAY_TRACES_ENABLED: 'false',
+          DASH0_XRAY_TRACES_ENABLED: 'true',
+          OTEL_PROPAGATORS: 'tracecontext,baggage,xray,xray-lambda',
         };
 
+    const TRACING_MODE = lambda.Tracing.ACTIVE;
     // --- Child Durable Function (invoked by parent) ---
     const childFn = new NodejsFunction(this, 'ChildFunction', {
       functionName: 'durable-enrich',
@@ -43,7 +46,8 @@ export class LambdaDurableFunctionOtelStack extends cdk.Stack {
       handler: 'handler',
       runtime: lambda.Runtime.NODEJS_22_X,
       layers: [otelLayer],
-      tracing: lambda.Tracing.PASS_THROUGH,
+      tracing: TRACING_MODE,
+    
       environment: {
         ...otelEnv,
       },
@@ -68,7 +72,7 @@ export class LambdaDurableFunctionOtelStack extends cdk.Stack {
       handler: 'handler',
       runtime: lambda.Runtime.NODEJS_22_X,
       layers: [otelLayer],
-      tracing: lambda.Tracing.PASS_THROUGH,
+      tracing: TRACING_MODE,
       environment: {
         ...otelEnv,
         CHILD_FUNCTION_ARN: childFn.functionArn + ':$LATEST',
@@ -98,7 +102,101 @@ export class LambdaDurableFunctionOtelStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'FunctionAliasArn', { value: alias.functionArn });
     new cdk.CfnOutput(this, 'ChildFunctionArn', { value: childFn.functionArn });
 
-    // --- Firehose to Dash0 for aws/spans log group ---
+    // --- Chain Durable Function (pure 3-step chain, no invokes or waits) ---
+    const chainFn = new NodejsFunction(this, 'ChainFunction', {
+      functionName: 'durable-chain',
+      entry: path.join(__dirname, '..', 'lambda-chain', 'index.ts'),
+      handler: 'handler',
+      runtime: lambda.Runtime.NODEJS_22_X,
+      layers: [otelLayer],
+      tracing: TRACING_MODE,
+      environment: {
+        ...otelEnv,
+      },
+      timeout: cdk.Duration.seconds(30),
+      durableConfig: {
+        executionTimeout: cdk.Duration.minutes(5),
+        retentionPeriod: cdk.Duration.days(3),
+      },
+    });
+
+    chainFn.role!.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicDurableExecutionRolePolicy'),
+    );
+    chainFn.role!.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName('AWSXRayDaemonWriteAccess'),
+    );
+
+    const chainAlias = new lambda.Alias(this, 'ChainLiveAlias', {
+      aliasName: 'live',
+      version: chainFn.currentVersion,
+    });
+
+    new cdk.CfnOutput(this, 'ChainFunctionAliasArn', { value: chainAlias.functionArn });
+
+    // --- Chain-Wait Durable Function (3 steps with a wait before step 3, tracing=PASS_THROUGH) ---
+    const chainWaitFn = new NodejsFunction(this, 'ChainWaitFunction', {
+      functionName: 'durable-chain-wait-passthrough',
+      entry: path.join(__dirname, '..', 'lambda-chain-wait', 'index.ts'),
+      handler: 'handler',
+      runtime: lambda.Runtime.NODEJS_22_X,
+      layers: [otelLayer],
+      tracing: TRACING_MODE,
+      environment: {
+        ...otelEnv,
+      },
+      timeout: cdk.Duration.seconds(30),
+      durableConfig: {
+        executionTimeout: cdk.Duration.minutes(5),
+        retentionPeriod: cdk.Duration.days(3),
+      },
+    });
+
+    chainWaitFn.role!.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicDurableExecutionRolePolicy'),
+    );
+    chainWaitFn.role!.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName('AWSXRayDaemonWriteAccess'),
+    );
+
+    const chainWaitAlias = new lambda.Alias(this, 'ChainWaitLiveAlias', {
+      aliasName: 'live',
+      version: chainWaitFn.currentVersion,
+    });
+
+    new cdk.CfnOutput(this, 'ChainWaitFunctionAliasArn', { value: chainWaitAlias.functionArn });
+
+    // --- Retry Durable Function (step 1 retries on first attempt, step 2 has 10min retry delay) ---
+    const retryFn = new NodejsFunction(this, 'RetryFunction', {
+      functionName: 'durable-retry',
+      entry: path.join(__dirname, '..', 'lambda-retry', 'index.ts'),
+      handler: 'handler',
+      runtime: lambda.Runtime.NODEJS_22_X,
+      layers: [otelLayer],
+      tracing: TRACING_MODE,
+      environment: {
+        ...otelEnv,
+      },
+      timeout: cdk.Duration.seconds(30),
+      durableConfig: {
+        executionTimeout: cdk.Duration.hours(1),
+        retentionPeriod: cdk.Duration.days(3),
+      },
+    });
+
+    retryFn.role!.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicDurableExecutionRolePolicy'),
+    );
+    retryFn.role!.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName('AWSXRayDaemonWriteAccess'),
+    );
+
+    const retryAlias = new lambda.Alias(this, 'RetryLiveAlias', {
+      aliasName: 'live',
+      version: retryFn.currentVersion,
+    });
+
+    new cdk.CfnOutput(this, 'RetryFunctionAliasArn', { value: retryAlias.functionArn });
     const dash0Endpoint = 'https://ingress.us-west-2.aws.dash0.com/firehose/cwspans';
     const dash0ApiKey = ssm.StringParameter.valueForStringParameter(
       this, '/lambda-durable-otel/dash0-api-key',

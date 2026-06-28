@@ -1,6 +1,6 @@
 graph TD
   node_start([Start])
-  step_1[enrich]
+  step_1[flaky-step]
   node_end([End])
 
   node_start --> step_1
@@ -9,4 +9,4 @@ graph TD
   style node_start fill:#5b8ab4,stroke:#4a7293,color:#e8edf2
   style step_1 fill:#4a8c72,stroke:#3d7360,color:#e0efe8
   style node_end fill:#5b8ab4,stroke:#4a7293,color:#e8edf2
-  click step_1 call onNodeClick(13)
+  click step_1 call onNodeClick(18)
