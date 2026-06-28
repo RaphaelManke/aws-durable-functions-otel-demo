@@ -33,6 +33,108 @@ span in the *other* function — producing a wrong cross-function causal chain.
 
 Both are step #1 in their respective functions — same hash, different functions.
 
+### Full span + link map (trace `6a410bd8697c623910a1cd6120199dba`)
+
+Spans are shown with their span ID and link targets. `──link──►` denotes an OTel span link
+(not a parent-child relationship). `└─` denotes parent-child.
+
+```
+INVOCATION 1  (durable-workflow, cold start)
+─────────────────────────────────────────────────────────────────────────────
+53957874840f7a9e  durable-workflow [SERVER]
+└─ 407019c5d9e711f5  handler
+   └─ 55517f58490209e2  invocation  [durable.execution.arn=5b5595a2]
+      │
+      ├─ 026806110351f2bf  validate (outer) [STEP op.id=c4ca4238]  links:2
+      │  │  ──link──► 026806110351f2bf (self? prior replay — none on first run)
+      │  │  ──link──► 7442731d2c090cdd (validate inner, same invocation)
+      │  └─ 7442731d2c090cdd  validate (inner) [STEP op.id=c4ca4238]  links:1
+      │        ──link──► (no prior step — this is step #1, link target is absent/null)
+      │
+      ├─ 8584d6284f99747f  Lambda.Checkpoint  links:0
+      │  └─ c3609a12da88caac  POST /durable-executions/...  links:0
+      │
+      ├─ 20bb507a4917096c  process (outer) [STEP op.id=c81e728d]  links:1
+      │  │  ──link──► 7442731d2c090cdd  (validate inner)  ✓ correct
+      │  └─ 2bf0e6c543559d2d  process (inner) [STEP op.id=c81e728d]  links:1
+      │        ──link──► 7442731d2c090cdd  (validate inner)  ✓ correct
+      │
+      ├─ 53ddecf8b4149425  Lambda.Checkpoint  links:0
+      │  └─ bda346b407ebe41c  POST  links:0
+      │
+      ├─ 6c801fad4f559848  Lambda.Checkpoint  links:0
+      │  └─ 0cbe545ef2ad4b62  POST  links:0
+      │
+      └─ 6f473045cd95e6f6  cooldown [WAIT op.id=eccbc87e]  links:0
+                                                            ⚠ no link to resume invocation
+
+
+INVOCATION 2  (durable-workflow)
+─────────────────────────────────────────────────────────────────────────────
+106f1ca168045122  durable-workflow [SERVER]           ⚠ root — no link from invocation 1
+└─ 04c56ff520df33ad  handler
+   └─ 400bc30e8a79737c  invocation  [durable.execution.arn=5b5595a2]
+      │
+      ├─ 6d0bf87c11229c1f  Lambda.Checkpoint  links:0
+      │  └─ 4849dc6835d092d9  POST  links:0
+      │
+      └─ d18f36efef0de843  enrich-user [CHAINED_INVOKE op.id=a87ff679]  links:0
+                                                    ⚠ no link to durable-enrich SERVER span
+
+
+CHILD FUNCTION  (durable-enrich, cold start, same traceId)
+─────────────────────────────────────────────────────────────────────────────
+5cbb216c71b8352e  durable-enrich [SERVER]             ⚠ root — no parent link from enrich-user
+├─ f5dad802de5ded8d  aws.lambda.initialization (1061ms)
+└─ a5d1534b3c256b67  handler  [faas.coldstart=true]
+   └─ 24da70afaab772c4  invocation  [durable.execution.arn=39a22573]
+      │
+      ├─ 026806110351f2bf  enrich (outer) [STEP op.id=c4ca4238]  links:0
+      │                                           ⚠ same op.id as validate in durable-workflow!
+      │  └─ 004e261792dcf157  enrich (inner) [STEP op.id=c4ca4238]  links:1
+      │        ──link──► 7442731d2c090cdd  (validate inner in durable-workflow!)
+      │                           ⚠ WRONG: cross-function link due to op.id collision
+      │
+      ├─ 09cb8b8c81083223  Lambda.Checkpoint  links:0
+      │  └─ 96123c3d25eee265  POST (637ms)  links:0
+      │
+      └─ [no link back to enrich-user in durable-workflow]
+
+
+INVOCATION 3  (durable-workflow)
+─────────────────────────────────────────────────────────────────────────────
+4b3b152565c4c52b  durable-workflow [SERVER]           ⚠ root — no link from invocation 2
+└─ 6e1e4627c78a7938  handler
+   └─ b61672b08762498f  invocation  [durable.execution.arn=5b5595a2]
+      │
+      ├─ e898c59e6496bdbe  Lambda.Checkpoint  links:0
+      │  └─ 9947fe2afb2b900d  POST  links:0
+      │
+      └─ 3543fdec00c92c8d  notify (outer) [STEP op.id=e4da3b7f]  links:1
+         │  ──link──► 004e261792dcf157  (enrich inner in durable-enrich)
+         │                     ⚠ WRONG: should link to process inner (2bf0e6c543559d2d)
+         │                       but op.id collision causes it to land on enrich (child fn)
+         └─ 3f97b32cd922cfed  notify (inner) [STEP op.id=e4da3b7f]  links:1
+               ──link──► 004e261792dcf157  (enrich inner in durable-enrich)
+                                   ⚠ WRONG: same cross-function collision
+```
+
+### Link chain — actual vs expected
+
+```
+ACTUAL (broken):
+  notify inner  3f97b32cd922cfed
+       ──link──► enrich inner  004e261792dcf157  (durable-enrich, step #1)
+                      ──link──► validate inner  7442731d2c090cdd  (durable-workflow, step #1)
+                                      ──link──► (null — step #1 has no prior step)
+
+EXPECTED (correct):
+  notify inner  3f97b32cd922cfed
+       ──link──► process inner  2bf0e6c543559d2d  (durable-workflow, step #2)
+                      ──link──► validate inner  7442731d2c090cdd  (durable-workflow, step #1)
+                                      ──link──► (null — step #1 has no prior step)
+```
+
 ### Incorrect link chain produced
 
 ```
