@@ -173,7 +173,7 @@ echo "$ENTRIES_SORTED" | while IFS= read -r entry; do
   {
     echo "## $title"
     echo ""
-    echo "**Source:** \`$rel_entry\`"
+    echo "**Source:** [\`$rel_entry\`]($rel_entry)"
     echo ""
 
     # Input types
