@@ -8,6 +8,8 @@ interface WorkflowEvent {
 
 const handler = withDurableExecution(
   async (event: WorkflowEvent, context: DurableContext) => {
+    context.logger.info(JSON.stringify({ xray_trace_id: process.env._X_AMZN_TRACE_ID ?? null }));
+
     const validated = await context.step('validate', async () => {
       if (!event.name) throw new Error('name is required');
       return { name: event.name, email: event.email ?? 'none' };
